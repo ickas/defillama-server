@@ -6,8 +6,7 @@ import { getLatestProtocolItems, } from '../db';
 import { dailyTvl, dailyUsdTokensTvl, dailyTokensTvl, hourlyTvl, hourlyUsdTokensTvl, hourlyTokensTvl, } from "../../utils/getLastRecord";
 import { log } from '@defillama/sdk'
 import { ChainCoinGekcoIds } from "../../utils/normalizeChain";
-import { getMetadataAll, readFromPGCache } from './file-cache'
-import { PG_CACHE_KEYS } from "../constants";
+import { clearOldCacheFolders, getMetadataAll, readHistoricalTVLMetadataFile, readTvlCacheAllFile } from './file-cache'
 import { Protocol } from "../../protocols/types";
 import { shuffleArray } from "../../utils/shared/shuffleArray";
 import PromisePool from "@supercharge/promise-pool";
@@ -41,6 +40,7 @@ export const cache: {
   historicalTvlForAllProtocolsMeta: any,
   feesAdapterCache: any,
   twitterOverview: any,
+  otherProtocolsMap: any,
 } = {
   metadata: {
     protocols: [],
@@ -66,16 +66,17 @@ export const cache: {
   historicalTvlForAllProtocolsMeta: {},
   feesAdapterCache: {},
   twitterOverview: {},
+  otherProtocolsMap: {},
 }
 
 const MINUTES = 60 * 1000
 const HOUR = 60 * MINUTES
 
-export async function initCache({ cacheType = RUN_TYPE.CRON } = { cacheType: RUN_TYPE.API_SERVER }) {
+export async function initCache({ cacheType = RUN_TYPE.API_SERVER }: { cacheType?: string } = { cacheType: RUN_TYPE.API_SERVER }) {
   console.time('Cache initialized: ' + cacheType)
   await updateMetadata()
   if (cacheType === RUN_TYPE.API_SERVER) {
-    const _cache = (await readFromPGCache(PG_CACHE_KEYS.CACHE_DATA_ALL)) ?? {}
+    const _cache = await readTvlCacheAllFile()
     Object.entries(_cache).forEach(([k, v]: any) => (cache as any)[k] = v)
 
     // await getDimensionsCacheV2(cacheType) // initialize dimensions cache // no longer needed since we pre-generate the files
@@ -100,11 +101,26 @@ export async function initCache({ cacheType = RUN_TYPE.CRON } = { cacheType: RUN
       tvlProtocolDataUpdate(cacheType),
       updateAllTvlData(cacheType),
     ])
+    addChildProtocolNames()
   }
+
 
   cache.twitterOverview = await getTwitterOverviewFileV2()
 
   console.timeEnd('Cache initialized: ' + cacheType)
+}
+
+function addChildProtocolNames() {
+  cache.otherProtocolsMap = {}
+  Object.keys(cache.childProtocols).forEach((parentProtocolId) => {
+    const isDead = (p: any) => p.deadFrom || p.deprecated
+    const deadProtocols = cache.childProtocols[parentProtocolId].filter(isDead)
+    const liveProtocols = cache.childProtocols[parentProtocolId].filter((p: any) => !isDead(p))
+    const sortProtocols = (a: any, b: any) => (cache.tvlProtocol[b.id]?.tvl ?? 0) - (cache.tvlProtocol[a.id]?.tvl ?? 0)
+    liveProtocols.sort(sortProtocols)
+    deadProtocols.sort(sortProtocols)
+    cache.otherProtocolsMap[parentProtocolId] = [liveProtocols, deadProtocols].flat().map((p: any) => p.name)
+  })
 }
 
 async function updateMetadata() {
@@ -165,6 +181,9 @@ async function updateRaises() {
 
 async function updateAllTvlData(cacheType?: string) {
   if (cacheType !== 'cron') return;
+
+  // to ensure that we dont run out of disk space
+  await clearOldCacheFolders()
   const { protocols, treasuries, entities } = cache.metadata
   let actions = [protocols, treasuries, entities].flat()
   shuffleArray(actions) // randomize order of execution
@@ -310,7 +329,7 @@ export const CACHE_KEYS = {
 
 async function setHistoricalTvlForAllProtocols() {
   try {
-    cache.historicalTvlForAllProtocolsMeta = await readFromPGCache(PG_CACHE_KEYS.HISTORICAL_TVL_DATA_META)
+    cache.historicalTvlForAllProtocolsMeta = await readHistoricalTVLMetadataFile()
   } catch (e) {
     console.error(e);
   }

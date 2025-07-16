@@ -22,7 +22,7 @@ import optimism from "./optimism";
 import polygon from "./polygon";
 // import solana from "./solana";
 // import xdai from "./xdai";
-import cosmos from "./cosmos";
+// import cosmos from "./cosmos";
 import synapse from "./synapse";
 import base from "./base";
 import neon_evm from "./neon_evm";
@@ -33,7 +33,7 @@ import linea from "./linea";
 import manta from "./manta";
 import astrzk from "./astrzk";
 import zklink from "./zklink";
-import celer from "./celer";
+// import celer from "./celer";
 import fraxtal from "./fraxtal";
 import symbiosis from "./symbiosis";
 import fuel from "./fuel";
@@ -42,6 +42,9 @@ import morph from "./morph";
 import aptos from "./aptosFa";
 import sophon from "./sophon";
 import unichan from "./unichain";
+import flow from "./flow";
+import layerzero from "./layerzero";
+import initia from "./initia";
 
 export type Token =
   | {
@@ -86,13 +89,13 @@ export const bridges = [
   // brc20,
   //bsc,
   fantom,
-  era,
+  // era,
   gasTokens,
   //harmony,
   // polygon,
   // solana
   //xdai
-  cosmos,
+  // cosmos,
   synapse,
   base,
   neon_evm,
@@ -103,7 +106,7 @@ export const bridges = [
   manta,
   astrzk,
   zklink,
-  celer,
+  // celer,
   fraxtal,
   symbiosis,
   fuel,
@@ -112,6 +115,9 @@ export const bridges = [
   aptos,
   // sophon,
   unichan,
+  flow,
+  // layerzero,
+  initia
 ].map(normalizeBridgeResults) as Bridge[];
 
 import { batchGet, batchWrite } from "../../utils/shared/dynamodb";
@@ -213,6 +219,9 @@ async function _storeTokensOfBridge(bridge: Bridge) {
         decimals = token.decimals;
         symbol = token.symbol;
       }
+
+      if (!decimals || !symbol) return;
+
       writes.push({
         PK: `asset#${token.from}`,
         SK: 0,

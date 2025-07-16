@@ -56,6 +56,11 @@ provider:
         - "s3:ListBucket"
         - "s3:*Object*"
       Resource: "*"
+    - Effect: Allow
+      Action:
+        - sts:AssumeRole
+      Resource:
+        - "arn:aws:iam::345594567026:role/defillama-role-345594567026"
   environment:
     ETHEREUM_RPC: ${file(./env.js):ETHEREUM_RPC}
     BSC_RPC: ${file(./env.js):BSC_RPC}
@@ -176,12 +181,26 @@ functions:
       - httpApi:
           path: /batchHistorical
           method: get
+  batchHistoricalSpan:
+    handler: src/getBatchHistoricalCoinsSpan.default
+    timeout: 60
+    events:
+      - httpApi:
+          path: /batchHistoricalSpan
+          method: get
   coinPercentageChange:
     handler: src/getPercentageChange.default
     timeout: 60
     events:
       - httpApi:
           path: /percentage/{coins}
+          method: get
+  coinVolumes:
+    handler: src/getVolume.default
+    timeout: 60
+    events:
+      - httpApi:
+          path: /volume/{coins}
           method: get
   block:
     handler: src/getBlock.default
@@ -190,6 +209,15 @@ functions:
       - httpApi:
           path: /block/{chain}/{timestamp}
           method: get
+    environment:
+      LLAMA_PROVIDER_RPC_GET_BLOCKNUMBER_TIMEOUT: 3000
+  batchBlocks:
+    handler: src/getBlock.batchBlocks
+    timeout: 60
+    events:
+      - httpApi:
+          path: /blocks/{chain}
+          method: post
     environment:
       LLAMA_PROVIDER_RPC_GET_BLOCKNUMBER_TIMEOUT: 3000
   corsPreflight:
